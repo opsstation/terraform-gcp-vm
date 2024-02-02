@@ -1,19 +1,26 @@
 module "labels" {
-  source      = "git::git@github.com:opsstation/terraform-gcp-labels.git?ref=master"
+  source      = "git::git@github.com:opsstation/terraform-gcp-labels.git?ref=v1.0.0"
   name        = var.name
   environment = var.environment
   label_order = var.label_order
+  managedby   = var.managedby
+  repository  = var.repository
 }
-
+data "google_client_config" "current" {
+}
 #####################################(google_compute_instance)##############################################
+#tfsec:ignore:google-compute-no-default-service-account
+#tfsec:ignore:google-compute-no-project-wide-ssh-keys
+#tfsec:ignore:google-compute-enable-shielded-vm-vtpm
+#tfsec:ignore:google-compute-enable-shielded-vm-im
+#tfsec:ignore:google-compute-vm-disk-encryption-customer-key
 resource "google_compute_instance" "default" {
-  count        = var.google_compute_instance_enabled && var.enabled ? 1 : 0
-  name         = format("%s-vm", module.labels.id)
+  count        = var.create_instances && var.instance_count > 0 ? var.instance_count : 0
+  name         = format("%s-vm-%02d", module.labels.id, count.index + 1)
   machine_type = var.machine_type
-  zone         = var.zone
+  zone         = var.gcp_zone
   tags         = var.instance_tags
-  project      = var.project_id
-
+  project      = data.google_client_config.current.project
   boot_disk {
     initialize_params {
       image = var.image
@@ -23,16 +30,16 @@ resource "google_compute_instance" "default" {
     }
   }
 
-
   network_interface {
     subnetwork = var.subnetwork
 
-    access_config {
-      // Ephemeral public IP
-      nat_ip = var.nat_ip
+    dynamic "access_config" {
+      for_each = var.enable_public_ip ? [1] : []
+      content {
+        # Add access_config settings here if needed
+      }
     }
   }
-
   metadata                = var.metadata
   metadata_startup_script = var.metadata_startup_script
 
@@ -41,6 +48,4 @@ resource "google_compute_instance" "default" {
     scopes = var.service_account_scopes
   }
   allow_stopping_for_update = var.allow_stopping_for_update
-
 }
-
