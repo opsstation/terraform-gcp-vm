@@ -20,9 +20,8 @@ module "vpc" {
 
 #------------------------------------------(subnet)------------------------------------------------------------
 module "subnet" {
-  #  source        = "opsstation/subnet/gcp"
-  #  version       = "1.0.1"
-  source        = "git::git@github.com:opsstation/terraform-gcp-subnet.git?ref=update/module"
+  source        = "opsstation/subnet/gcp"
+  version       = "1.0.1"
   name          = ["dev"]
   environment   = "test"
   region        = "asia-northeast1"
@@ -40,9 +39,8 @@ module "subnet" {
 
 #------------------------------------------(firewall)--------------------------------------------------------------
 module "firewall" {
-  #  source      = "opsstation/firewall/gcp"
-  #  version     = "1.0.1"
-  source      = "git::git@github.com:opsstation/terraform-gcp-firewall.git?ref=feat/release-1"
+  source      = "opsstation/firewall/gcp"
+  version     = "1.0.1"
   name        = "firewall"
   environment = "OpsStation"
   network     = module.vpc.vpc_id
