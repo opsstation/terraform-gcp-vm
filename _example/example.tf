@@ -1,88 +1,86 @@
 provider "google" {
-  project = "testing-gcp-ops"
+  project = "opsstation-474608"
   region  = "asia-northeast1"
   zone    = "asia-northeast1-a"
 }
 #------------------------------------------(vpc)--------------------------------------------------------------
 module "vpc" {
-  source                                    = "git::git@github.com:opsstation/terraform-gcp-vpc.git?ref=v1.0.0"
-  name                                      = "dev"
-  environment                               = "test"
+  source                                    = "opsstation/vpc/gcp"
+  version                                   = "1.0.1"
+  name                                      = "vpc"
+  environment                               = "OpsStation"
   label_order                               = ["name", "environment"]
   mtu                                       = 1460
   routing_mode                              = "REGIONAL"
-  google_compute_network_enabled            = true
   network_firewall_policy_enforcement_order = "AFTER_CLASSIC_FIREWALL"
+  network_enabled                           = true
   delete_default_routes_on_create           = false
 }
 
+
 #------------------------------------------(subnet)------------------------------------------------------------
 module "subnet" {
-  source        = "git::git@github.com:opsstation/terraform-gcp-subnet.git?ref=v1.0.0"
-  subnet_names  = ["dev-subnet1"]
-  name          = "dev"
+  source        = "opsstation/subnet/gcp"
+  version       = "1.0.1"
+  name          = ["dev"]
   environment   = "test"
-  label_order   = ["name", "environment"]
-  gcp_region    = "asia-northeast1"
+  region        = "asia-northeast1"
   network       = module.vpc.vpc_id
-  ip_cidr_range = ["10.10.0.0/16"]
+  ip_cidr_range = ["10.10.1.0/24"]
+  log_config = {
+    enable               = true
+    aggregation_interval = "INTERVAL_5_MIN"
+    flow_sampling        = 0.5
+    metadata             = "INCLUDE_ALL_METADATA"
+    metadata_fields      = []
+    filter_expr          = null
+  }
 }
 
 #------------------------------------------(firewall)--------------------------------------------------------------
 module "firewall" {
-  source        = "git::git@github.com:opsstation/terraform-gcp-firewall.git?ref=v1.0.0"
-  name          = "firewall"
-  environment   = "test"
-  label_order   = ["name", "environment"]
-  network       = module.vpc.vpc_id
-  source_ranges = ["0.0.0.0/0"]
-
-  allow = [
-    { protocol = "tcp"
-      ports    = ["22", "80"]
+  source      = "opsstation/firewall/gcp"
+  version     = "1.0.1"
+  name        = "firewall"
+  environment = "OpsStation"
+  network     = module.vpc.vpc_id
+  ingress_rules = [
+    {
+      name          = "allow-tcp-http-ingress"
+      description   = "Allow TCP, HTTP ingress traffic"
+      disabled      = false
+      direction     = "INGRESS"
+      priority      = 1000
+      source_ranges = ["0.0.0.0/0"]
+      allow = [
+        {
+          protocol = "tcp"
+          ports    = ["22", "80"]
+        }
+      ]
     }
   ]
 }
 
+
 #------------------------------------------(compute_instance)--------------------------------------------------------------
 module "compute_instance" {
-  source                 = "../"
+  source                 = "./../"
   name                   = "dev"
   environment            = "test"
   instance_count         = 1
+  zone                   = "asia-northeast1-a"
   instance_tags          = ["foo", "bar"]
   machine_type           = "e2-small"
   image                  = "ubuntu-2204-jammy-v20230908"
-  gcp_zone               = "asia-northeast1-a"
   service_account_scopes = ["cloud-platform"]
   subnetwork             = module.subnet.subnet_id
+  network                = module.vpc.vpc_id
 
-  # Enable public IP only if enable_public_ip is true
-  enable_public_ip = true
+  enable_public_ip = true # Enable public IP only if enable_public_ip is true
   metadata = {
     ssh-keys = <<EOF
-      test:ssh-rsa AAAAB3NzaC1y
-    EOF
-  }
-}
-
-module "compute_instance1" {
-  source                 = "../"
-  name                   = "dev1"
-  environment            = "test"
-  instance_count         = 1
-  instance_tags          = ["foo", "bar"]
-  machine_type           = "e2-small"
-  image                  = "ubuntu-2204-jammy-v20230908"
-  gcp_zone               = "asia-northeast1-a"
-  service_account_scopes = ["cloud-platform"]
-  subnetwork             = module.subnet.subnet_id
-
-  # Enable public IP only if enable_public_ip is true
-  enable_public_ip = false
-  metadata = {
-    ssh-keys = <<EOF
-      test:ssh-rsa AAAAB3N
+      ubuntu:ssh-rsa AAAAB3NzaCph/FXUAHBaekf+hzL58= suresh@suresh
     EOF
   }
 }
